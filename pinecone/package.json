@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/rag-pinecone",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "Pinecone vector-store adapter for @absolutejs/rag",
 	"repository": {
 		"type": "git",
@@ -33,7 +33,7 @@
 		"@absolutejs/rag": "^0.0.20"
 	},
 	"peerDependencies": {
-		"@pinecone-database/pinecone": ">=6.0.0 <7.0.0"
+		"@pinecone-database/pinecone": ">=6.0.0 <8.0.0"
 	},
 	"devDependencies": {
 		"@absolutejs/ai": "^0.0.9",
