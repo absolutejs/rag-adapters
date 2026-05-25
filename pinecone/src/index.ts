@@ -1,16 +1,25 @@
 import type {
+	CreateIndexOptions,
+	Index,
+	IndexModel,
+	PineconeRecord,
+	QueryResponse,
+	RecordMetadata,
+	ScoredPineconeRecord
+} from '@pinecone-database/pinecone';
+import type {
 	RAGBackendCapabilities,
 	RAGCollection,
 	RAGQueryInput,
 	RAGQueryResult,
 	RAGUpsertInput,
 	RAGVectorStore
-} from '@absolutejs/rag';
+} from '@absolutejs/rag/adapter-kit';
 import {
 	createRAGCollection,
 	createRAGVector,
 	normalizeVector
-} from '@absolutejs/rag';
+} from '@absolutejs/rag/adapter-kit';
 
 export const ABSOLUTE_PINECONE_RAG_PACKAGE_NAME = '@absolutejs/rag-pinecone';
 
@@ -22,27 +31,7 @@ export const PINECONE_DISTANCE_METRICS = [
 
 export type PineconeDistanceMetric = 'cosine' | 'euclidean' | 'dotproduct';
 
-export type PineconeIndexClient = {
-	upsert: (records: unknown[]) => Promise<unknown>;
-	query: (input: Record<string, unknown>) => Promise<{
-		matches?: Array<{
-			id: string;
-			score?: number;
-			values?: number[];
-			metadata?: Record<string, unknown>;
-		}>;
-	}>;
-	fetch: (ids: string[]) => Promise<{
-		records?: Record<string, unknown>;
-	}>;
-	deleteMany: (input: string[] | Record<string, unknown>) => Promise<unknown>;
-	deleteAll: () => Promise<unknown>;
-	describeIndexStats: () => Promise<{
-		totalRecordCount?: number;
-		namespaces?: Record<string, { recordCount?: number }>;
-	}>;
-	namespace?: (namespace: string) => PineconeIndexClient;
-};
+type PineconeIndexClient = Index<RecordMetadata>;
 
 export type PineconeRAGVectorConfig = {
 	provider: 'pinecone';
@@ -87,16 +76,6 @@ export type PineconePodSpec = {
 
 export type PineconeIndexSpec = PineconeServerlessSpec | PineconePodSpec;
 
-export type PineconeIndexDescription = {
-	name: string;
-	dimension: number;
-	metric: PineconeDistanceMetric;
-	host?: string;
-	spec?: PineconeIndexSpec;
-	status?: { ready?: boolean; state?: string };
-	deletionProtection?: 'enabled' | 'disabled';
-};
-
 export type DescribePineconeIndexOptions = {
 	apiKey?: string;
 	indexName: string;
@@ -116,7 +95,7 @@ export type EnsurePineconeIndexOptions = {
 
 export type EnsurePineconeIndexResult = {
 	created: boolean;
-	description: PineconeIndexDescription | undefined;
+	description: IndexModel | undefined;
 };
 
 type ResolvedPineconeVectorConfig = {
@@ -126,19 +105,6 @@ type ResolvedPineconeVectorConfig = {
 };
 
 type MetadataValue = string | number | boolean | string[];
-
-type PineconeRecord = {
-	id: string;
-	values: number[];
-	metadata: Record<string, MetadataValue>;
-};
-
-type PineconeQueryMatch = {
-	id: string;
-	score?: number;
-	values?: number[];
-	metadata?: Record<string, unknown>;
-};
 
 type PineconeFilter = Record<string, unknown>;
 
@@ -196,27 +162,21 @@ const resolveVectorConfig = (
 	return { provider: 'pinecone', dimensions, distanceMetric };
 };
 
-type PineconeSDKModule = {
-	Pinecone: new (config: { apiKey: string }) => {
-		index: (name: string, host?: string) => PineconeIndexClient;
-		createIndex: (input: Record<string, unknown>) => Promise<unknown>;
-		describeIndex: (name: string) => Promise<PineconeIndexDescription>;
-	};
-};
+type PineconeSDK = typeof import('@pinecone-database/pinecone');
 
-let pineconeModulePromise: Promise<PineconeSDKModule> | undefined;
-const loadPineconeSDK = (): Promise<PineconeSDKModule> => {
+let pineconeModulePromise: Promise<PineconeSDK> | undefined;
+const loadPineconeSDK = (): Promise<PineconeSDK> => {
 	if (!pineconeModulePromise) {
-		pineconeModulePromise = (
-			import('@pinecone-database/pinecone') as Promise<unknown> as Promise<PineconeSDKModule>
-		).catch((error: unknown) => {
-			pineconeModulePromise = undefined;
-			throw new Error(
-				`${PKG}: failed to load @pinecone-database/pinecone — install it as a dependency. (${
-					error instanceof Error ? error.message : String(error)
-				})`
-			);
-		});
+		pineconeModulePromise = import('@pinecone-database/pinecone').catch(
+			(error: unknown) => {
+				pineconeModulePromise = undefined;
+				throw new Error(
+					`${PKG}: failed to load @pinecone-database/pinecone — install it as a dependency. (${
+						error instanceof Error ? error.message : String(error)
+					})`
+				);
+			}
+		);
 	}
 
 	return pineconeModulePromise;
@@ -232,8 +192,10 @@ const resolveIndexClientFactory = (
 
 	let cached: PineconeIndexClient | undefined;
 
-	const applyNamespace = (idx: PineconeIndexClient): PineconeIndexClient => {
-		if (!namespace || typeof idx.namespace !== 'function') return idx;
+	const applyNamespace = (
+		idx: PineconeIndexClient
+	): PineconeIndexClient => {
+		if (!namespace) return idx;
 
 		return idx.namespace(namespace);
 	};
@@ -312,11 +274,9 @@ const sanitizeMetadataValue = (value: unknown): MetadataValue | undefined => {
 	return undefined;
 };
 
-const sanitizeMetadata = (
-	metadata: unknown
-): Record<string, MetadataValue> => {
+const sanitizeMetadata = (metadata: unknown): RecordMetadata => {
 	if (!isObjectRecord(metadata)) return {};
-	const out: Record<string, MetadataValue> = {};
+	const out: RecordMetadata = {};
 	for (const [key, value] of Object.entries(metadata)) {
 		if (RESERVED_METADATA_KEYS.has(key)) continue;
 		const sanitized = sanitizeMetadataValue(value);
@@ -386,9 +346,7 @@ const translateFilter = (filter: unknown): PineconeFilter | undefined => {
 			if (!Array.isArray(value)) continue;
 			const subs = value
 				.map((entry) => translateFilter(entry))
-				.filter(
-					(entry): entry is PineconeFilter => entry !== undefined
-				);
+				.filter((entry): entry is PineconeFilter => entry !== undefined);
 			if (subs.length > 0) clauses.push({ [key]: subs });
 			continue;
 		}
@@ -414,7 +372,7 @@ const translateFilter = (filter: unknown): PineconeFilter | undefined => {
 };
 
 const scoreForMetric = (
-	rawScore: unknown,
+	rawScore: number | undefined,
 	distanceMetric: PineconeDistanceMetric
 ): number => {
 	if (typeof rawScore !== 'number' || !Number.isFinite(rawScore)) return 0;
@@ -431,8 +389,8 @@ const scoreForMetric = (
 const buildPineconeRecord = (
 	chunk: RAGUpsertInput['chunks'][number],
 	values: number[]
-): PineconeRecord => {
-	const metadata: Record<string, MetadataValue> = {
+): PineconeRecord<RecordMetadata> => {
+	const metadata: RecordMetadata = {
 		...sanitizeMetadata(chunk.metadata),
 		chunkId: chunk.chunkId,
 		text: chunk.text
@@ -444,7 +402,7 @@ const buildPineconeRecord = (
 };
 
 const extractQueryResult = (
-	match: PineconeQueryMatch,
+	match: ScoredPineconeRecord<RecordMetadata>,
 	distanceMetric: PineconeDistanceMetric
 ): RAGQueryResult => {
 	const meta = isObjectRecord(match.metadata) ? match.metadata : {};
@@ -511,15 +469,14 @@ export const createPineconeStore = (
 	const query = async (input: RAGQueryInput): Promise<RAGQueryResult[]> => {
 		const client = await getClient();
 		const filter = translateFilter(input.filter);
-		const queryInput: Record<string, unknown> = {
+		const result: QueryResponse<RecordMetadata> = await client.query({
 			vector: normalizeVector(input.queryVector),
 			topK: input.topK,
 			includeMetadata: true,
-			includeValues: false
-		};
-		if (filter) queryInput.filter = filter;
-		const result = await client.query(queryInput);
-		const matches = Array.isArray(result?.matches) ? result.matches : [];
+			includeValues: false,
+			...(filter ? { filter } : {})
+		});
+		const matches = Array.isArray(result.matches) ? result.matches : [];
 
 		return matches.map((match) =>
 			extractQueryResult(match, vector.distanceMetric)
@@ -537,7 +494,7 @@ export const createPineconeStore = (
 				PINECONE_FETCH_BATCH_SIZE
 			)) {
 				const response = await client.fetch(batch);
-				total += Object.keys(response?.records ?? {}).length;
+				total += Object.keys(response.records ?? {}).length;
 			}
 
 			return total;
@@ -547,24 +504,23 @@ export const createPineconeStore = (
 			Object.keys(input.filter).length > 0
 		) {
 			const filter = translateFilter(input.filter);
-			const probeVector = new Array(vector.dimensions).fill(0);
-			const queryInput: Record<string, unknown> = {
+			const probeVector = new Array<number>(vector.dimensions).fill(0);
+			const result: QueryResponse<RecordMetadata> = await client.query({
 				vector: probeVector,
 				topK: PINECONE_FILTERED_COUNT_TOPK,
 				includeMetadata: false,
-				includeValues: false
-			};
-			if (filter) queryInput.filter = filter;
-			const result = await client.query(queryInput);
+				includeValues: false,
+				...(filter ? { filter } : {})
+			});
 
-			return Array.isArray(result?.matches) ? result.matches.length : 0;
+			return Array.isArray(result.matches) ? result.matches.length : 0;
 		}
 		const stats = await client.describeIndexStats();
 		if (namespace) {
-			return stats?.namespaces?.[namespace]?.recordCount ?? 0;
+			return stats.namespaces?.[namespace]?.recordCount ?? 0;
 		}
 
-		return stats?.totalRecordCount ?? 0;
+		return stats.totalRecordCount ?? 0;
 	};
 
 	const remove = async (
@@ -593,7 +549,7 @@ export const createPineconeStore = (
 			if (!filter) return 0;
 			const counted = await count({ filter: input.filter });
 			try {
-				await client.deleteMany({ filter });
+				await client.deleteMany(filter);
 			} catch (error) {
 				if (!isPineconeNotFound(error)) throw error;
 			}
@@ -627,7 +583,7 @@ export const createPineconeStore = (
 			serverSideFiltering: true,
 			streamingIngestStatus: false
 		})
-	} as RAGVectorStore;
+	};
 };
 
 const DEFAULT_INDEX_READY_TIMEOUT_MS = 120000;
@@ -636,22 +592,28 @@ const DEFAULT_SERVERLESS_SPEC: PineconeServerlessSpec = {
 	serverless: { cloud: 'aws', region: 'us-east-1' }
 };
 
-type PineconeErrorLike = {
-	status?: number;
-	statusCode?: number;
-	response?: { status?: number };
-	name?: string;
-	message?: string;
+const readNumberProperty = (
+	source: Record<string, unknown>,
+	key: string
+): number | undefined => {
+	const value = source[key];
+
+	return typeof value === 'number' ? value : undefined;
 };
 
 const isPineconeNotFound = (error: unknown): boolean => {
-	if (!error) return false;
-	const err = error as PineconeErrorLike;
-	const status = err.status ?? err.statusCode ?? err.response?.status ?? undefined;
+	if (!isObjectRecord(error)) return false;
+	const status =
+		readNumberProperty(error, 'status') ??
+		readNumberProperty(error, 'statusCode') ??
+		(isObjectRecord(error.response)
+			? readNumberProperty(error.response, 'status')
+			: undefined);
 	if (status === 404) return true;
-	const name = String(err.name ?? '');
+	const name = typeof error.name === 'string' ? error.name : '';
 	if (name === 'PineconeNotFoundError') return true;
-	const message = String(err.message ?? '').toLowerCase();
+	const message =
+		typeof error.message === 'string' ? error.message.toLowerCase() : '';
 
 	return (
 		message.includes('not found') ||
@@ -662,7 +624,7 @@ const isPineconeNotFound = (error: unknown): boolean => {
 
 const resolveProvisioningClient = async (
 	options: DescribePineconeIndexOptions | EnsurePineconeIndexOptions
-): Promise<InstanceType<PineconeSDKModule['Pinecone']>> => {
+): Promise<InstanceType<PineconeSDK['Pinecone']>> => {
 	const apiKey = options.apiKey ?? process.env.PINECONE_API_KEY;
 	if (!apiKey) {
 		throw new Error(
@@ -681,24 +643,24 @@ const resolveProvisioningClient = async (
 };
 
 const waitForIndexReady = async (
-	pc: InstanceType<PineconeSDKModule['Pinecone']>,
+	pc: InstanceType<PineconeSDK['Pinecone']>,
 	indexName: string,
 	timeoutMs: number,
 	pollIntervalMs: number
-): Promise<PineconeIndexDescription> => {
+): Promise<IndexModel> => {
 	const deadline = Date.now() + timeoutMs;
 	for (;;) {
 		const description = await pc.describeIndex(indexName);
-		const status = description?.status;
+		const status = description.status;
 		const ready =
-			status?.ready === true ||
-			status?.state === 'Ready' ||
-			status?.state === 'ScalingUp';
+			status.ready === true ||
+			status.state === 'Ready' ||
+			status.state === 'ScalingUp';
 		if (ready) return description;
 		if (Date.now() >= deadline) {
 			throw new Error(
 				`${PKG}: index "${indexName}" did not become ready within ${timeoutMs}ms (last state: ${
-					status?.state ?? 'unknown'
+					status.state ?? 'unknown'
 				})`
 			);
 		}
@@ -708,7 +670,7 @@ const waitForIndexReady = async (
 
 export const describePineconeIndex = async (
 	options: DescribePineconeIndexOptions
-): Promise<PineconeIndexDescription | undefined> => {
+): Promise<IndexModel | undefined> => {
 	const pc = await resolveProvisioningClient(options);
 	try {
 		return await pc.describeIndex(options.indexName);
@@ -717,6 +679,13 @@ export const describePineconeIndex = async (
 		throw error;
 	}
 };
+
+const toCreateIndexSpec = (
+	spec: PineconeIndexSpec
+): CreateIndexOptions['spec'] =>
+	'serverless' in spec
+		? { serverless: spec.serverless }
+		: { pod: spec.pod };
 
 export const ensurePineconeIndex = async (
 	options: EnsurePineconeIndexOptions
@@ -741,7 +710,7 @@ export const ensurePineconeIndex = async (
 	const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_INDEX_READY_POLL_MS;
 	const shouldWait = options.waitUntilReady !== false;
 
-	let existing: PineconeIndexDescription | undefined;
+	let existing: IndexModel | undefined;
 	try {
 		existing = await pc.describeIndex(options.indexName);
 	} catch (error) {
@@ -751,7 +720,9 @@ export const ensurePineconeIndex = async (
 	if (existing) {
 		if (existing.dimension !== options.dimensions) {
 			throw new Error(
-				`${PKG}: index "${options.indexName}" already exists with dimension=${existing.dimension}, but ${options.dimensions} was requested`
+				`${PKG}: index "${options.indexName}" already exists with dimension=${String(
+					existing.dimension
+				)}, but ${options.dimensions} was requested`
 			);
 		}
 		if (existing.metric && existing.metric !== metric) {
@@ -759,7 +730,7 @@ export const ensurePineconeIndex = async (
 				`${PKG}: index "${options.indexName}" already exists with metric="${existing.metric}", but "${metric}" was requested`
 			);
 		}
-		if (shouldWait && existing.status?.ready !== true) {
+		if (shouldWait && existing.status.ready !== true) {
 			const description = await waitForIndexReady(
 				pc,
 				options.indexName,
@@ -773,8 +744,8 @@ export const ensurePineconeIndex = async (
 		return { created: false, description: existing };
 	}
 
-	const spec = options.spec ?? DEFAULT_SERVERLESS_SPEC;
-	await pc.createIndex({
+	const spec = toCreateIndexSpec(options.spec ?? DEFAULT_SERVERLESS_SPEC);
+	const createOptions: CreateIndexOptions = {
 		name: options.indexName,
 		dimension: options.dimensions,
 		metric,
@@ -782,10 +753,11 @@ export const ensurePineconeIndex = async (
 		...(options.deletionProtection
 			? { deletionProtection: options.deletionProtection }
 			: {})
-	});
+	};
+	await pc.createIndex(createOptions);
 
 	if (!shouldWait) {
-		let description: PineconeIndexDescription | undefined;
+		let description: IndexModel | undefined;
 		try {
 			description = await pc.describeIndex(options.indexName);
 		} catch (error) {
@@ -822,3 +794,13 @@ export const createPineconeRAG = (options: PineconeRAGOptions): PineconeRAG => {
 		getCapabilities: () => store.getCapabilities?.()
 	};
 };
+
+export type {
+	CreateIndexOptions,
+	Index,
+	IndexModel,
+	PineconeRecord,
+	QueryResponse,
+	RecordMetadata,
+	ScoredPineconeRecord
+} from '@pinecone-database/pinecone';

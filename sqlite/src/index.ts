@@ -3,16 +3,15 @@ import type {
 	RAGCollection,
 	RAGVectorStore,
 	RAGVectorStoreStatus,
-	SQLiteRAGStoreOptions,
 	SQLiteVecResolution
-} from '@absolutejs/rag';
+} from '@absolutejs/rag/adapter-kit';
+import { createRAGCollection, ragPlugin } from '@absolutejs/rag/adapter-kit';
+import { createSQLiteRAGStore as createLocalSQLiteRAGStore } from './createSQLiteRAGStore';
 import {
-	createRAGCollection,
-	createSQLiteRAGStore as createCoreSQLiteRAGStore,
-	ragPlugin,
 	resolveAbsoluteSQLiteVec,
 	resolveAbsoluteSQLiteVecExtensionPath
-} from '@absolutejs/rag';
+} from './resolveAbsoluteSQLiteVec';
+import type { SQLiteRAGStoreOptions } from './types';
 
 export const ABSOLUTE_SQLITE_RAG_PACKAGE_NAME = '@absolutejs/rag-sqlite';
 
@@ -66,9 +65,9 @@ const nativeMessageFromResolution = (
 	}
 };
 
-export const createSQLiteRAGStore: typeof createCoreSQLiteRAGStore = (
+export const createSQLiteRAGStore: typeof createLocalSQLiteRAGStore = (
 	options = {}
-) => createCoreSQLiteRAGStore(options);
+) => createLocalSQLiteRAGStore(options);
 
 export const createSQLiteRAGCollection = (
 	options: SQLiteRAGCollectionOptions = {}
@@ -106,12 +105,10 @@ export const summarizeSQLiteRAGSupport = (
 ): SQLiteRAGSupportSummary => {
 	const status = target?.getStatus?.();
 	const capabilities = target?.getCapabilities?.();
-	const nativeStatus = status?.native as
-		| { resolution?: SQLiteVecResolution; requested?: boolean; active?: boolean }
-		| undefined;
-	const resolution = nativeStatus?.resolution ?? resolveAbsoluteSQLiteVec();
-	const nativeRequested = nativeStatus?.requested ?? false;
-	const nativeActive = nativeStatus?.active ?? false;
+	const native = status?.backend === 'sqlite' ? status.native : undefined;
+	const resolution = native?.resolution ?? resolveAbsoluteSQLiteVec();
+	const nativeRequested = native?.requested ?? false;
+	const nativeActive = native?.active ?? false;
 
 	let actionableMessage = nativeMessageFromResolution(resolution);
 

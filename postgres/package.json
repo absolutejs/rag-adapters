@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/rag-postgres",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"description": "PostgreSQL (pgvector) vector-store adapter for @absolutejs/rag",
 	"repository": {
 		"type": "git",
@@ -24,21 +24,18 @@
 		"vector"
 	],
 	"scripts": {
-		"build": "rm -rf dist && bun build src/index.ts --outdir dist --sourcemap --target=bun --external @absolutejs/rag --external postgres && tsc --project tsconfig.build.json",
+		"build": "rm -rf dist && bun build src/index.ts --outdir dist --sourcemap --target=bun --external @absolutejs/rag --external @absolutejs/rag/adapter-kit --external @absolutejs/ai && tsc --project tsconfig.build.json",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
 		"format": "prettier --write \"./**/*.{ts,json,md}\"",
 		"release": "bun run format && bun run build && bun publish"
 	},
 	"dependencies": {
-		"@absolutejs/rag": "^0.0.19"
-	},
-	"peerDependencies": {
-		"postgres": ">= 3.4.0"
+		"@absolutejs/rag": "^0.0.20"
 	},
 	"devDependencies": {
-		"@types/bun": "1.2.9",
-		"postgres": "3.4.9",
+		"@absolutejs/ai": "^0.0.9",
+		"@types/bun": "1.3.9",
 		"prettier": "3.5.3",
 		"typescript": "5.8.3"
 	},

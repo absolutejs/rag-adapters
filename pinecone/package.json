@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/rag-pinecone",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "Pinecone vector-store adapter for @absolutejs/rag",
 	"repository": {
 		"type": "git",
@@ -23,21 +23,22 @@
 		"vector"
 	],
 	"scripts": {
-		"build": "rm -rf dist && bun build src/index.ts --outdir dist --sourcemap --target=bun --external @absolutejs/rag --external @pinecone-database/pinecone && tsc --project tsconfig.build.json",
+		"build": "rm -rf dist && bun build src/index.ts --outdir dist --sourcemap --target=bun --external @absolutejs/rag --external @absolutejs/rag/adapter-kit --external @absolutejs/ai --external @pinecone-database/pinecone && tsc --project tsconfig.build.json",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
 		"format": "prettier --write \"./**/*.{ts,json,md}\"",
 		"release": "bun run format && bun run build && bun publish"
 	},
 	"dependencies": {
-		"@absolutejs/rag": "^0.0.19"
+		"@absolutejs/rag": "^0.0.20"
 	},
 	"peerDependencies": {
-		"@pinecone-database/pinecone": ">=5.0.0 <7.0.0"
+		"@pinecone-database/pinecone": ">=6.0.0 <7.0.0"
 	},
 	"devDependencies": {
-		"@pinecone-database/pinecone": ">=5.0.0 <7.0.0",
-		"@types/bun": "1.2.9",
+		"@absolutejs/ai": "^0.0.9",
+		"@pinecone-database/pinecone": ">=6.0.0 <7.0.0",
+		"@types/bun": "1.3.9",
 		"prettier": "3.5.3",
 		"typescript": "5.8.3"
 	},
