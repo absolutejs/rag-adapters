@@ -1,0 +1,59 @@
+{
+	"name": "@absolutejs/rag-sqlite",
+	"version": "0.0.5",
+	"description": "SQLite vector-store adapter for @absolutejs/rag with optional native vec0 acceleration",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/absolutejs/rag-adapters.git",
+		"directory": "sqlite"
+	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"type": "module",
+	"license": "CC BY-NC 4.0",
+	"author": "Alex Kahn",
+	"publishConfig": {
+		"access": "public"
+	},
+	"keywords": [
+		"absolutejs",
+		"rag",
+		"sqlite",
+		"vector",
+		"sqlite-vec"
+	],
+	"scripts": {
+		"build": "rm -rf dist && bun build src/index.ts --outdir dist --sourcemap --target=bun --external @absolutejs/rag && tsc --project tsconfig.build.json",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit",
+		"format": "prettier --write \"./**/*.{ts,json,md}\"",
+		"release": "bun run format && bun run build && bun publish"
+	},
+	"dependencies": {
+		"@absolutejs/rag": "^0.0.19"
+	},
+	"optionalDependencies": {
+		"@absolutejs/absolute-rag-sqlite-darwin-arm64": "0.0.2",
+		"@absolutejs/absolute-rag-sqlite-darwin-x64": "0.0.2",
+		"@absolutejs/absolute-rag-sqlite-linux-arm64": "0.0.2",
+		"@absolutejs/absolute-rag-sqlite-linux-x64": "0.0.2",
+		"@absolutejs/absolute-rag-sqlite-windows-x64": "0.0.2"
+	},
+	"devDependencies": {
+		"@types/bun": "1.2.9",
+		"prettier": "3.5.3",
+		"typescript": "5.8.3"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	]
+}
