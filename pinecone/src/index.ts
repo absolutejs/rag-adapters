@@ -462,7 +462,13 @@ export const createPineconeStore = (
 			})
 		);
 		for (const batch of chunkArray(records, PINECONE_UPSERT_BATCH_SIZE)) {
-			await client.upsert(batch);
+			// Pinecone SDK 6.x mis-types upsert/fetch as bare arrays, but their
+			// runtime validators require object form ({ records } / { ids }) —
+			// verified empirically. Cast to the (wrong) declared param type so we
+			// still send the runtime-correct shape. See UPSTREAM_ISSUES.md.
+			await client.upsert({
+				records: batch
+			} as unknown as Parameters<typeof client.upsert>[0]);
 		}
 	};
 
@@ -493,7 +499,10 @@ export const createPineconeStore = (
 				input.chunkIds,
 				PINECONE_FETCH_BATCH_SIZE
 			)) {
-				const response = await client.fetch(batch);
+				// SDK 6.x mis-types fetch as a bare array; runtime needs { ids }.
+				const response = await client.fetch({
+					ids: batch
+				} as unknown as Parameters<typeof client.fetch>[0]);
 				total += Object.keys(response.records ?? {}).length;
 			}
 
@@ -533,7 +542,7 @@ export const createPineconeStore = (
 				PINECONE_FETCH_BATCH_SIZE
 			)) {
 				try {
-					await client.deleteMany(batch);
+					await client.deleteMany({ ids: batch });
 				} catch (error) {
 					if (!isPineconeNotFound(error)) throw error;
 				}
@@ -549,7 +558,7 @@ export const createPineconeStore = (
 			if (!filter) return 0;
 			const counted = await count({ filter: input.filter });
 			try {
-				await client.deleteMany(filter);
+				await client.deleteMany({ filter });
 			} catch (error) {
 				if (!isPineconeNotFound(error)) throw error;
 			}
