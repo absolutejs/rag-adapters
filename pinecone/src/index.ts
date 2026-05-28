@@ -462,13 +462,7 @@ export const createPineconeStore = (
 			})
 		);
 		for (const batch of chunkArray(records, PINECONE_UPSERT_BATCH_SIZE)) {
-			// Pinecone SDK 6.x mis-types upsert/fetch as bare arrays, but their
-			// runtime validators require object form ({ records } / { ids }) —
-			// verified empirically. Cast to the (wrong) declared param type so we
-			// still send the runtime-correct shape. See UPSTREAM_ISSUES.md.
-			await client.upsert({
-				records: batch
-			} as unknown as Parameters<typeof client.upsert>[0]);
+			await client.upsert({ records: batch });
 		}
 	};
 
@@ -499,10 +493,7 @@ export const createPineconeStore = (
 				input.chunkIds,
 				PINECONE_FETCH_BATCH_SIZE
 			)) {
-				// SDK 6.x mis-types fetch as a bare array; runtime needs { ids }.
-				const response = await client.fetch({
-					ids: batch
-				} as unknown as Parameters<typeof client.fetch>[0]);
+				const response = await client.fetch({ ids: batch });
 				total += Object.keys(response.records ?? {}).length;
 			}
 
