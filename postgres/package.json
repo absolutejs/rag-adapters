@@ -1,11 +1,15 @@
 {
 	"name": "@absolutejs/rag-postgres",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"description": "PostgreSQL (pgvector) vector-store adapter for @absolutejs/rag",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/absolutejs/rag-adapters.git",
 		"directory": "postgres"
+	},
+	"homepage": "https://github.com/absolutejs/rag-adapters/tree/main/postgres",
+	"bugs": {
+		"url": "https://github.com/absolutejs/rag-adapters/issues"
 	},
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",

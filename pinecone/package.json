@@ -1,11 +1,15 @@
 {
 	"name": "@absolutejs/rag-pinecone",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"description": "Pinecone vector-store adapter for @absolutejs/rag",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/absolutejs/rag-adapters.git",
 		"directory": "pinecone"
+	},
+	"homepage": "https://github.com/absolutejs/rag-adapters/tree/main/pinecone",
+	"bugs": {
+		"url": "https://github.com/absolutejs/rag-adapters/issues"
 	},
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",
