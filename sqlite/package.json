@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/rag-sqlite",
-	"version": "0.0.7",
+	"version": "0.0.8",
 	"description": "SQLite vector-store adapter for @absolutejs/rag with optional native vec0 acceleration",
 	"repository": {
 		"type": "git",
