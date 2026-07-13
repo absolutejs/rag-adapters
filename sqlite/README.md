@@ -33,4 +33,4 @@ console.log(rag.getNativeSupport().actionableMessage);
 
 ## License
 
-CC BY-NC 4.0
+Apache License 2.0. See [LICENSE](./LICENSE).

@@ -1,6 +1,7 @@
 {
 	"name": "@absolutejs/rag-adapters",
 	"private": true,
+	"license": "Apache-2.0",
 	"type": "module",
 	"description": "Vector-store adapters for @absolutejs/rag (Pinecone, PostgreSQL/pgvector, SQLite)",
 	"workspaces": [
