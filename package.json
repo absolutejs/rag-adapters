@@ -13,7 +13,7 @@
 		"build": "bun run --filter './*' build",
 		"config": "absolute config",
 		"format": "prettier --write \"./*/src/**/*.{ts,json,md}\"",
-		"test": "bun run --filter './*' test",
+		"test": "bun test",
 		"typecheck": "bun run --filter './*' typecheck"
 	},
 	"devDependencies": {
