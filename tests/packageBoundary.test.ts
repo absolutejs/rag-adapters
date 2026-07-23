@@ -22,7 +22,7 @@ describe("RAG adapter package boundaries", () => {
       expect(packageJson.peerDependencies?.["@absolutejs/rag"]).toBe(
         ">=0.0.20 <0.1.0",
       );
-      expect(packageJson.devDependencies?.["@absolutejs/rag"]).toBe("0.0.29");
+      expect(packageJson.devDependencies?.["@absolutejs/rag"]).toBe("0.0.31");
     });
   }
 });
