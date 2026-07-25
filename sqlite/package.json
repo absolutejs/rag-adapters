@@ -4,7 +4,7 @@
   "description": "SQLite vector-store adapter for @absolutejs/rag with optional native vec0 acceleration",
   "repository": {
     "type": "git",
-    "url": "https://github.com/absolutejs/rag-adapters.git",
+    "url": "git+https://github.com/absolutejs/rag-adapters.git",
     "directory": "sqlite"
   },
   "homepage": "https://github.com/absolutejs/rag-adapters/tree/main/sqlite",
