@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/rag-pinecone",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Pinecone vector-store adapter for @absolutejs/rag",
   "repository": {
     "type": "git",
@@ -38,12 +38,12 @@
     "@sinclair/typebox": "^0.34.0"
   },
   "peerDependencies": {
-    "@absolutejs/rag": ">=0.1.0 <0.2.0",
+    "@absolutejs/rag": ">=0.1.0 <1",
     "@pinecone-database/pinecone": ">=7.0.0 <9.0.0"
   },
   "devDependencies": {
     "@absolutejs/ai": "0.0.47",
-    "@absolutejs/rag": "0.1.1",
+    "@absolutejs/rag": "0.5.0",
     "@absolutejs/sync": "2.11.0",
     "@pinecone-database/pinecone": "8.1.0",
     "@types/bun": "1.3.14",
@@ -80,8 +80,8 @@
           "@absolutejs/rag/adapter-kit"
         ],
         "optional": false,
-        "range": ">=0.1.0 <0.2.0",
-        "tested": "0.1.1"
+        "range": ">=0.1.0 <1",
+        "tested": "0.5.0"
       },
       "@pinecone-database/pinecone": {
         "artifactImports": [
