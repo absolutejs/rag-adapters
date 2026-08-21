@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/rag-sqlite",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "SQLite vector-store adapter for @absolutejs/rag with optional native vec0 acceleration",
   "repository": {
     "type": "git",
@@ -35,11 +35,11 @@
     "release": "bun run format && bun run build && bun publish"
   },
   "dependencies": {
-    "@absolutejs/manifest": "^0.7.2",
+    "@absolutejs/manifest": "^0.9.0",
     "@sinclair/typebox": "^0.34.0"
   },
   "peerDependencies": {
-    "@absolutejs/rag": ">=0.1.0 <0.2.0"
+    "@absolutejs/rag": ">=0.1.0 <1"
   },
   "optionalDependencies": {
     "@absolutejs/absolute-rag-sqlite-darwin-arm64": "0.0.2",
@@ -74,21 +74,6 @@
     "README.md"
   ],
   "absolutejs": {
-    "manifestContract": 1,
-    "runtimePeers": {
-      "@absolutejs/rag": {
-        "artifactImports": [
-          "@absolutejs/rag/adapter-kit"
-        ],
-        "artifactReferences": [],
-        "buildExternals": [
-          "@absolutejs/rag",
-          "@absolutejs/rag/adapter-kit"
-        ],
-        "optional": false,
-        "range": ">=0.1.0 <0.2.0",
-        "tested": "0.1.1"
-      }
-    }
+    "manifestContract": 1
   }
 }
