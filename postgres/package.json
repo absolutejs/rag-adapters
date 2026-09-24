@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/rag-postgres",
-  "version": "0.0.13",
+  "version": "0.1.0",
   "description": "PostgreSQL (pgvector) vector-store adapter for @absolutejs/rag",
   "repository": {
     "type": "git",
@@ -64,7 +64,9 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "benchmarks"
   ],
   "absolutejs": {
     "manifestContract": 1

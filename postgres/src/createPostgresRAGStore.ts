@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
 	RAGBackendCapabilities,
 	RAGLexicalQueryInput,
@@ -22,6 +23,12 @@ import {
 	summarizeSQLiteCandidateCoverage
 } from "@absolutejs/rag/adapter-kit";
 import type { PostgresRAGStoreOptions } from "./types";
+
+// The expression must remain identical in index creation and retrieval.
+const lexicalVector = `setweight(to_tsvector('simple'::regconfig, coalesce(title, '')), 'A') ||
+  setweight(to_tsvector('simple'::regconfig, text), 'B') ||
+  setweight(to_tsvector('simple'::regconfig, coalesce(source, '')), 'C') ||
+  setweight(jsonb_to_tsvector('simple'::regconfig, coalesce(metadata, '{}'::jsonb), '["string"]'::jsonb), 'D')`;
 
 const DEFAULT_DIMENSIONS = RAG_VECTOR_DIMENSIONS_DEFAULT;
 const DEFAULT_TABLE_NAME = "rag_chunks";
@@ -56,6 +63,7 @@ type PostgresStoredRow = {
   metadata: unknown;
   embedding?: string | null;
   distance?: number | null;
+  lexical_score?: number | string;
 };
 
 type PostgresHealthRow = {
@@ -1056,6 +1064,7 @@ const ensurePostgresSchema = async (
     indexLists: number;
     indexType: PostgresIndexType;
     qualifiedTableName: string;
+    lexicalMode: "native" | "portable";
   },
 ) => {
   await db.unsafe("create extension if not exists vector");
@@ -1073,6 +1082,10 @@ const ensurePostgresSchema = async (
 			embedding vector(${input.dimensions}) not null
 		)
 	`);
+  if (input.lexicalMode === "native") {
+    const suffix = createHash("sha256").update(input.qualifiedTableName).digest("hex").slice(0, 16);
+    await db.unsafe(`create index if not exists "rag_lexical_${suffix}" on ${input.qualifiedTableName} using gin ((${lexicalVector}))`);
+  }
   const indexSql = buildPostgresIndexSql(input);
   if (indexSql) {
     await db.unsafe(indexSql);
@@ -1083,6 +1096,8 @@ export const createPostgresRAGStore = (
   options: PostgresRAGStoreOptions = {},
 ): RAGVectorStore => {
   const dimensions = options.dimensions ?? DEFAULT_DIMENSIONS;
+  const lexicalMode = options.lexicalMode ?? "native";
+  if (lexicalMode !== "native" && lexicalMode !== "portable") throw new Error("Invalid lexicalMode");
   const distanceMetric = options.distanceMetric ?? "cosine";
   const queryMultiplier = normalizeQueryMultiplier(options.queryMultiplier);
   const indexType = normalizePostgresIndexType(options.indexType);
@@ -1131,6 +1146,7 @@ export const createPostgresRAGStore = (
 
   const init = () => {
     initialized ??= ensurePostgresSchema(db, {
+      lexicalMode,
       dimensions,
       distanceMetric,
       hnswEfConstruction,
@@ -1347,7 +1363,7 @@ export const createPostgresRAGStore = (
     return returned;
   };
 
-  const queryLexical = async (input: RAGLexicalQueryInput) => {
+  const queryLexicalPortable = async (input: RAGLexicalQueryInput) => {
     await init();
     const pushdownFilter = buildPostgresPushdownFilter(input.filter);
     const lexicalFilterPlan = buildPostgresFilterPlan(pushdownFilter);
@@ -1371,6 +1387,31 @@ export const createPostgresRAGStore = (
       source: result.source,
       title: result.title,
     }));
+  };
+
+  const queryLexical = async (input: RAGLexicalQueryInput) => {
+    if (lexicalMode === "portable") return queryLexicalPortable(input);
+    if (!Number.isSafeInteger(input.topK) || input.topK < 0 || input.topK > 10_000)
+      throw new Error("Native lexical topK must be an integer from 0 to 10000");
+    if (!input.topK || !input.query.trim()) return [];
+    const filter = buildPostgresFilterPlan(
+      input.filter && Object.keys(input.filter).length ? input.filter : undefined, 1,
+    );
+    if (!filter) throw new Error("Native lexical search requires a fully supported SQL metadata filter; use lexicalMode: portable for custom filters");
+    await init();
+    const rows = await db.unsafe(`with search_query as (
+      select coalesce(string_agg(quote_literal(term), ' | '), '')::tsquery as query
+      from unnest(tsvector_to_array(to_tsvector('simple'::regconfig, $1::text))) as term
+    ) select chunk_id, text, title, source, metadata,
+      ts_rank_cd((${lexicalVector}), search_query.query, 32) as lexical_score
+      from ${qualifiedTableName}, search_query
+      where (${lexicalVector}) @@ search_query.query${filter.clause ? ` AND (${filter.clause})` : ""}
+      order by lexical_score desc, chunk_id asc limit $${filter.params.length + 2}`,
+      [input.query, ...filter.params, input.topK]) as PostgresStoredRow[];
+    return rows.map((row) => ({ chunk: mapRowToChunk(row), score: Number(row.lexical_score ?? 0) }))
+      .filter(({ chunk }) => matchesFilter(chunk, input.filter))
+      .map(({ chunk, score }) => ({ chunkId: chunk.chunkId, chunkText: chunk.text,
+        metadata: chunk.metadata, score, source: chunk.source, title: chunk.title }));
   };
 
   const upsert = async (input: RAGUpsertInput) => {

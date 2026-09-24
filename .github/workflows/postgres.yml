@@ -1,0 +1,31 @@
+name: PostgreSQL adapter
+on:
+  push:
+    paths: ['postgres/**', '.github/workflows/postgres.yml', 'bun.lock']
+  pull_request:
+    paths: ['postgres/**', '.github/workflows/postgres.yml', 'bun.lock']
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_PASSWORD: lexical-test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAG_LEXICAL_TEST_URL: postgres://postgres:lexical-test@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: bun run --cwd postgres typecheck
+      - run: bun test postgres/tests
+      - run: bun run --cwd postgres build

@@ -3,6 +3,8 @@
 // either as a connection string or a ready-made `Bun.SQL` instance.
 
 export type PostgresRAGStoreOptions = {
+	/** Native uses a GIN full-text index; portable retains the in-memory lexical scorer. */
+	lexicalMode?: "native" | "portable";
 	connectionString?: string;
 	sql?: InstanceType<typeof Bun.SQL>;
 	dimensions?: number;

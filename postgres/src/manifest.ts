@@ -41,6 +41,9 @@ export const manifest = defineManifest<Record<never, never>>()({
 				]
 			},
 			settings: Type.Object({
+                lexicalMode: Type.Optional(Type.Union([Type.Literal('native'), Type.Literal('portable')], {
+                    title: 'Lexical retrieval', description: 'Native uses PostgreSQL GIN full-text indexing. Portable loads candidates into memory with the RAG lexical scorer.'
+                })),
 				dimensions: Type.Optional(
 					Type.Integer({
 						description:
